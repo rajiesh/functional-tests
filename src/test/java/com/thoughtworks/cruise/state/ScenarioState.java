@@ -16,6 +16,7 @@
 
 package com.thoughtworks.cruise.state;
 
+import com.jayway.restassured.response.Response;
 import com.thoughtworks.cruise.HttpContext;
 import com.thoughtworks.cruise.HttpContext.ApiTransport;
 import com.thoughtworks.cruise.utils.RuntimeVariableSubstituter;
@@ -40,6 +41,7 @@ public class ScenarioState implements Replacer, CurrentUsernameProvider {
 	private Map<String, String> packageRepositoryURIMappings = new HashMap<String, String>();
     private Map<String, String> packageRepositoryHttpRepoNames = new HashMap<String, String>();
 
+
 	private String currentPipeline;
 	private String currentUserName;
 
@@ -52,6 +54,8 @@ public class ScenarioState implements Replacer, CurrentUsernameProvider {
 	private ApiTransport httpScheme;
     private Map<String,File> artifactNameToFile = new HashMap<String, File>();
     private Map<String, String> keyValueStore = new HashMap<String, String>();
+
+    private Response response;
 	
 	
 	public ScenarioState() {
@@ -65,6 +69,14 @@ public class ScenarioState implements Replacer, CurrentUsernameProvider {
 	public void storeAsValidConfigNamed(String name, CruiseConfigDom validConfig) {
 		validConfigurations.put(name, validConfig);
 	}
+
+	public void storeDashboardResponse(Response response){
+	    this.response = response;
+    }
+
+    public Response getDashboardResponse(){
+	    return this.response;
+    }
 	
 	public String logicalPipelineName(String runtimePipelineName) {
 		for (String key : pipelineNameMappings.keySet()	) {
