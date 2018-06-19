@@ -16,6 +16,9 @@
 
 package com.thoughtworks.cruise.page;
 
+import com.jayway.restassured.RestAssured;
+import com.jayway.restassured.response.Response;
+import org.hamcrest.Matchers;
 import com.thoughtworks.cruise.Regex;
 import com.thoughtworks.cruise.Urls;
 import com.thoughtworks.cruise.client.TalkToCruise;
@@ -30,44 +33,75 @@ import com.thoughtworks.cruise.utils.Assertions.Function;
 import com.thoughtworks.cruise.utils.Assertions.Predicate;
 import com.thoughtworks.cruise.utils.ScenarioHelper;
 import com.thoughtworks.cruise.utils.Timeout;
-import net.sf.sahi.client.Browser;
 import net.sf.sahi.client.ElementStub;
+import org.bouncycastle.util.encoders.Base64;
 import org.hamcrest.core.Is;
 import org.hamcrest.text.StringContains;
 import org.junit.Assert;
 
+import java.util.HashMap;
 import java.util.List;
 
 import static junit.framework.Assert.assertTrue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.is;
 
-public class OnPipelineDashboardPage extends CruisePage {
+
+public class OnPipelineDashboardPage  {
     private static final String FAILED = "Failed";
     private static final String PASSED = "Passed";
-    private final CurrentPageState currentPageState;
+
+    private final ScenarioState scenarioState;
+
     private final ScenarioHelper scenarioHelper;
     private final PipelinePartial pipelinePartial;
     private final TalkToCruise talkToCruise;
     private final Configuration configuration;
     private boolean autoRefresh = false;
+    private String dashboardApiVersion= "application/vnd.go.cd.v1+json";
     private final RepositoryState repositoryState;
 
     public OnPipelineDashboardPage(ScenarioState scenarioState, CurrentPageState currentPageState, ScenarioHelper scenarioHelper,
-                                   Browser browser, TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
-        this(scenarioState, currentPageState, scenarioHelper, false, browser, talkToCruise, configuration, repositoryState);
-        currentPageState.currentPageIs(Page.PIPELINE_DASHBOARD);
+                                   TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
+        this(scenarioState, currentPageState, scenarioHelper, false, talkToCruise, configuration, repositoryState);
     }
 
     public OnPipelineDashboardPage(ScenarioState scenarioState, CurrentPageState currentPageState, ScenarioHelper scenarioHelper,
-                                   boolean alreadyOn, Browser browser, TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
-        super(scenarioState, alreadyOn, browser);
-        this.currentPageState = currentPageState;
+                                   boolean alreadyOn, TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
+        this.scenarioState = scenarioState;
         this.talkToCruise = talkToCruise;
         this.configuration = configuration;
         this.scenarioHelper = scenarioHelper;
         this.repositoryState = repositoryState;
-        this.pipelinePartial = new PipelinePartial(scenarioState, this, browser);
+        this.pipelinePartial = new PipelinePartial(scenarioState);
+    }
+
+    private Response getDashboard(){
+
+        HashMap<String, String> headers = new HashMap<String, String>();
+
+        String user = talkToCruise.currentUserNameProvider.loggedInUser();
+        if (user != null) {
+            String auth = "Basic "+new String(Base64.encode(String.format("%s:badger", user).getBytes()));
+            headers.put("Authorization", auth);
+        }
+
+        headers.put("Accept", dashboardApiVersion);
+        headers.put("Content-Type", "application/json");
+
+        return RestAssured.given().
+                headers(headers).
+                when().get(Urls.urlFor("/go/api/dashboard"));
+
+    }
+
+    @com.thoughtworks.gauge.Step("On Pipeline Dashboard Page")
+    public void getLatestDashboard() throws Exception {
+        Response response = getDashboard();
+        scenarioState.storeDashboardResponse(response);
+        response.then().statusCode(200);
     }
 
     @com.thoughtworks.gauge.Step("Looking at pipeline <pipelineName>")
@@ -75,98 +109,59 @@ public class OnPipelineDashboardPage extends CruisePage {
         scenarioState.usingPipeline(pipelineName);
     }
 
-    @com.thoughtworks.gauge.Step("Navigate to pipeline dashboard page")
-    public void navigateToPipelineDashboardPage() throws Exception {
-        navigateToURL();
-        currentPageState.currentPageIs(Page.PIPELINE_DASHBOARD);
-    }
-
-    @Override
-    protected String url() {
-        return Urls.urlFor("/old_dashboard?autoRefresh=" + autoRefresh);
-    }
-
-    @com.thoughtworks.gauge.Step("Turn on autoRefresh - On Pipeline Dashboard Page")
-    public void turnOnAutoRefresh() throws Exception {
-        autoRefresh = true;
-        open();
-    }
-
-    @com.thoughtworks.gauge.Step("Turn off autoRefresh - On Pipeline Dashboard Page")
-    public void turnOffAutoRefresh() throws Exception {
-        autoRefresh = false;
-        open();
-    }
-
-    @com.thoughtworks.gauge.Step("On Pipeline Dashboard Page")
-    public void goToPipelineDashboradPage() throws Exception {
-        navigateToURL();
-    }
-
-    protected void reloadPage() {
-        if (!autoRefresh) {
-            // browser.navigateTo(Urls.urlFor(OnServerDetailPage.URL));
-            browserWrapper.reload();
-        }
-    }
-
     @com.thoughtworks.gauge.Step("Verify pipeline is in group <pipelineGroupName>")
     public void verifyPipelineIsInGroup(String pipelineGroupName) throws Exception {
-        ElementStub groupElement = pipelineGroupElement(pipelineGroupName);
-        if (!groupElement.exists()) {
-            Assert.fail(String.format("Unable to find pipeline group '%s'", pipelineGroupName));
-        }
-        if (!browser.link(String.format("/%s/", scenarioState.currentPipeline())).in(groupElement).exists()) {
-            Assert.fail(String.format("Unable to find pipeline '%s'", scenarioState.currentRuntimePipelineName()));
-        }
+        scenarioState.getDashboardResponse().then()
+                .body(String.format("_embedded.pipeline_groups.find " +
+                        "{it.name == '%s'}._embedded.pipelines.find { it.name == '%s'}.name"
+                        ,pipelineGroupName,scenarioState.currentPipeline()), is(scenarioState.currentPipeline()));
     }
 
-    private ElementStub pipelineGroupElement(String pipelineGroupName) {
-        return browser.heading2(pipelineGroupName).parentNode("DIV");
-    }
 
-    @com.thoughtworks.gauge.Step("Click on pipeline name")
-    public void clickOnPipelineName() throws Exception {
-        browser.link(scenarioState.currentRuntimePipelineName()).click();
-        // driver.findElement(By.xpath(pipelineLinkXpath())).click();
-        currentPageState.currentPageIs(CurrentPageState.Page.PIPELINE_HISTORY);
-    }
 
     @com.thoughtworks.gauge.Step("Verify stage <oneBasedIndexOfStage> is <stageStatus> on pipeline with label <pipelineLabel>")
     public void verifyStageIsOnPipelineWithLabel(final Integer oneBasedIndexOfStage, final String stageStatus, final String pipelineLabel) throws Exception {
-        Assertions.waitUntil(Timeout.FIVE_MINUTES, new Predicate() {
-            public boolean call() throws Exception {
-                reloadPage();
-                return cssClassOfStageBar(oneBasedIndexOfStage, pipelineLabel).contains(stageStatus);
-            }
-        });
+
+        scenarioState.getDashboardResponse().then()
+                .body(String.format("_embedded.pipeline_groups.collect " +
+                        "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
+                        "{ it.label == '%s' }._embedded.stages[%s]}.status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)), is(stageStatus));
     }
 
     @com.thoughtworks.gauge.Step("Wait for stage <stageName> status to be <expectedStatus> with label <pipelineLabel>")
     public void waitForStageStatusToBeWithLabel(final String stageName, final String expectedStatus, final String pipelineLabel) throws Exception {
+
         Assertions.waitUntil(Timeout.FIVE_MINUTES, new Predicate() {
             public boolean call() throws Exception {
-                reloadPage();
-                List<ElementStub> stageBars = browserWrapper.collectNear("div", "/stage_bar /", elementPipelineLabel(pipelineLabel));
-                for (ElementStub stageBar : stageBars) {
-                    if (stageBar.fetch("className").contains(expectedStatus) && stageBar.fetch("title").startsWith(stageName + " ")) {
-                        return true;
-                    }
+                String status = getDashboard().then()
+                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
+                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
+                                "{ it.label == '%s' }._embedded.stages.find { it.name == '%s'}}.status",scenarioState.currentPipeline(),pipelineLabel,stageName));
+                if(status.contains(expectedStatus)){
+                    return true;
                 }
                 return false;
             }
         });
+
     }
 
     @com.thoughtworks.gauge.Step("Wait for current status of stage <stageName> to be <expectedStatus>")
     public void waitForCurrentStatusOfStageToBe(final String stageName, final String expectedStatus) throws Exception {
+
         Assertions.waitUntil(Timeout.ONE_MINUTE, new Predicate() {
             public boolean call() throws Exception {
-                reloadPage();
-                ElementStub latestStageElement = browser.div("latest_stage").in(pipelineElement());
-                return latestStageElement.exists(true) && latestStageElement.getText().trim().contains(String.format("%s: %s", expectedStatus, stageName));
+                String status = getDashboard().then()
+                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
+                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances[-1]" +
+                                "._embedded.stages.find { it.name == '%s'}}.status",scenarioState.currentPipeline(),stageName));
+                if(status.contains(expectedStatus)){
+                    return true;
+                }
+                return false;
             }
         });
+
     }
 
     @com.thoughtworks.gauge.Step("Verify stage <oneBasedIndexOfStage> named <stageName> is <stageStatus> on pipeline with label <pipelineLabel> having stage counter <stageCounter>")
@@ -174,11 +169,19 @@ public class OnPipelineDashboardPage extends CruisePage {
                                                                         final String stageStatus, final String pipelineLabel, final int stageCounter) throws Exception {
         Assertions.waitUntil(Timeout.FIVE_MINUTES, new Predicate() {
             public boolean call() throws Exception {
-                reloadPage();
+                String status = getDashboard().then()
+                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
+                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
+                                "{ it.label == '%s' }._embedded.stages[%s]}.status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
+                String stageCounterLink = getDashboard().then()
+                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
+                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
+                                "{ it.label == '%s' }._embedded.stages[%s]}._links.self.href[0]",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
                 String stageLinkForThisCounter = String.format("%s/%s/%s/%s", scenarioState.currentRuntimePipelineName(), pipelineLabel, stageName, stageCounter);
-                boolean stageWithCounterExists = browser.byXPath("//a[contains(@href, '" + stageLinkForThisCounter + "')]").exists();
-
-                return stageWithCounterExists && cssClassOfStageBar(oneBasedIndexOfStage, pipelineLabel).contains(stageStatus);
+                if(status.contains(stageStatus) && stageCounterLink.contains(stageLinkForThisCounter)){
+                    return true;
+                }
+                return false;
             }
         });
     }
@@ -819,6 +822,10 @@ public class OnPipelineDashboardPage extends CruisePage {
 
     private String currentPipeline() {
         return scenarioState.currentPipeline();
+    }
+
+    private String stageStateOnPipelineLabel(){
+        getDashboard().then().body()
     }
 
     private String cssClassOfStageBar(final Integer oneBasedIndexOfStage, final String pipelineLabel) {
