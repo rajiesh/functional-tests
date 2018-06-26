@@ -55,7 +55,8 @@ public class ScenarioState implements Replacer, CurrentUsernameProvider {
     private Map<String,File> artifactNameToFile = new HashMap<String, File>();
     private Map<String, String> keyValueStore = new HashMap<String, String>();
 
-    private Response response;
+    private Response dashboardResponse;
+    private Response buildCauseResponse;
 	
 	
 	public ScenarioState() {
@@ -70,12 +71,20 @@ public class ScenarioState implements Replacer, CurrentUsernameProvider {
 		validConfigurations.put(name, validConfig);
 	}
 
+	public void storeBuildCauseResponse(Response response){
+		this.buildCauseResponse = response;
+	}
+
+    public Response getBuildCauseResponse(){
+        return this.buildCauseResponse;
+    }
+
 	public void storeDashboardResponse(Response response){
-	    this.response = response;
+	    this.dashboardResponse = response;
     }
 
     public Response getDashboardResponse(){
-	    return this.response;
+	    return this.dashboardResponse;
     }
 	
 	public String logicalPipelineName(String runtimePipelineName) {
