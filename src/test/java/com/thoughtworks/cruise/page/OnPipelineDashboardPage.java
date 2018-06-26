@@ -1,5 +1,5 @@
 /*************************GO-LICENSE-START*********************************
- * Copyright 2015 ThoughtWorks, Inc.
+ * Copyright 2018 ThoughtWorks, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,6 @@
 
 package com.thoughtworks.cruise.page;
 
-import com.jayway.restassured.RestAssured;
-import com.jayway.restassured.response.Response;
-import org.hamcrest.Matchers;
-import com.thoughtworks.cruise.Regex;
 import com.thoughtworks.cruise.Urls;
 import com.thoughtworks.cruise.client.TalkToCruise;
 import com.thoughtworks.cruise.context.Configuration;
@@ -27,391 +23,56 @@ import com.thoughtworks.cruise.state.CurrentPageState;
 import com.thoughtworks.cruise.state.CurrentPageState.Page;
 import com.thoughtworks.cruise.state.RepositoryState;
 import com.thoughtworks.cruise.state.ScenarioState;
-import com.thoughtworks.cruise.util.ElementUtil;
 import com.thoughtworks.cruise.utils.Assertions;
-import com.thoughtworks.cruise.utils.Assertions.Function;
 import com.thoughtworks.cruise.utils.Assertions.Predicate;
 import com.thoughtworks.cruise.utils.ScenarioHelper;
 import com.thoughtworks.cruise.utils.Timeout;
+import net.sf.sahi.client.Browser;
 import net.sf.sahi.client.ElementStub;
-import org.bouncycastle.util.encoders.Base64;
 import org.hamcrest.core.Is;
 import org.hamcrest.text.StringContains;
 import org.junit.Assert;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
-import static junit.framework.Assert.assertTrue;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.is;
 
-
-public class OnPipelineDashboardPage  {
+public class OnPipelineDashboardPage extends CruisePage {
     private static final String FAILED = "Failed";
     private static final String PASSED = "Passed";
-
-    private final ScenarioState scenarioState;
-
+    private final CurrentPageState currentPageState;
     private final ScenarioHelper scenarioHelper;
-    private final PipelinePartial pipelinePartial;
     private final TalkToCruise talkToCruise;
     private final Configuration configuration;
     private boolean autoRefresh = false;
-    private String dashboardApiVersion= "application/vnd.go.cd.v1+json";
-    private String triggerPipelineAPIVersion= "application/vnd.go.cd.v1+json";
-    private String pausePipelineAPIVersion= "application/vnd.go.cd.v1+json";
     private final RepositoryState repositoryState;
 
     public OnPipelineDashboardPage(ScenarioState scenarioState, CurrentPageState currentPageState, ScenarioHelper scenarioHelper,
-                                   TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
-        this(scenarioState, currentPageState, scenarioHelper, false, talkToCruise, configuration, repositoryState);
+                                   Browser browser, TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
+        this(scenarioState, currentPageState, scenarioHelper, false, browser, talkToCruise, configuration, repositoryState);
+        currentPageState.currentPageIs(Page.PIPELINE_DASHBOARD);
     }
 
     public OnPipelineDashboardPage(ScenarioState scenarioState, CurrentPageState currentPageState, ScenarioHelper scenarioHelper,
-                                   boolean alreadyOn, TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
-        this.scenarioState = scenarioState;
+                                   boolean alreadyOn, Browser browser, TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
+        super(scenarioState, alreadyOn, browser);
+        this.currentPageState = currentPageState;
         this.talkToCruise = talkToCruise;
         this.configuration = configuration;
         this.scenarioHelper = scenarioHelper;
         this.repositoryState = repositoryState;
-        this.pipelinePartial = new PipelinePartial(scenarioState);
-    }
-
-    private Response getDashboard(){
-
-        HashMap<String, String> headers = new HashMap<String, String>();
-
-        String user = talkToCruise.currentUserNameProvider.loggedInUser();
-        if (user != null) {
-            String auth = "Basic "+new String(Base64.encode(String.format("%s:badger", user).getBytes()));
-            headers.put("Authorization", auth);
-        }
-
-        headers.put("Accept", dashboardApiVersion);
-        headers.put("Content-Type", "application/json");
-
-        return RestAssured.given().
-                headers(headers).
-                when().get(Urls.urlFor("/go/api/dashboard"));
-
-    }
-
-    private Response triggerPipelineUsingAPI(String name){
-
-        HashMap<String, String> headers = new HashMap<String, String>();
-
-        String user = talkToCruise.currentUserNameProvider.loggedInUser();
-        if (user != null) {
-            String auth = "Basic "+new String(Base64.encode(String.format("%s:badger", user).getBytes()));
-            headers.put("Authorization", auth);
-        }
-
-        headers.put("Accept", triggerPipelineAPIVersion);
-        headers.put("Content-Type", "application/json");
-        headers.put("X-GoCD-Confirm", "true");
-
-
-        return RestAssured.given().
-                headers(headers).
-                when().get(Urls.urlFor(String.format("/go/api/pipelines/%s/schedule", name)));
-
-    }
-
-    @com.thoughtworks.gauge.Step("On Pipeline Dashboard Page")
-    public void getLatestDashboard() throws Exception {
-        Response response = getDashboard();
-        scenarioState.storeDashboardResponse(response);
-        response.then().statusCode(200);
-    }
-
-    @com.thoughtworks.gauge.Step("Looking at pipeline <pipelineName>")
-    public void lookingAtPipeline(String pipelineName) throws Exception {
-        scenarioState.usingPipeline(pipelineName);
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline is in group <pipelineGroupName>")
-    public void verifyPipelineIsInGroup(String pipelineGroupName) throws Exception {
-        scenarioState.getDashboardResponse().then()
-                .body(String.format("_embedded.pipeline_groups.find " +
-                        "{it.name == '%s'}._embedded.pipelines.find { it.name == '%s'}.name"
-                        ,pipelineGroupName,scenarioState.currentPipeline()), is(scenarioState.currentPipeline()));
     }
 
 
 
-    @com.thoughtworks.gauge.Step("Verify stage <oneBasedIndexOfStage> is <stageStatus> on pipeline with label <pipelineLabel>")
-    public void verifyStageIsOnPipelineWithLabel(final Integer oneBasedIndexOfStage, final String stageStatus, final String pipelineLabel) throws Exception {
-
-        scenarioState.getDashboardResponse().then()
-                .body(String.format("_embedded.pipeline_groups.collect " +
-                        "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
-                        "{ it.label == '%s' }._embedded.stages[%s]}.status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)), is(stageStatus));
-    }
-
-    @com.thoughtworks.gauge.Step("Wait for stage <stageName> status to be <expectedStatus> with label <pipelineLabel>")
-    public void waitForStageStatusToBeWithLabel(final String stageName, final String expectedStatus, final String pipelineLabel) throws Exception {
-
-        Assertions.waitUntil(Timeout.FIVE_MINUTES, new Predicate() {
-            public boolean call() throws Exception {
-                String status = getDashboard().then()
-                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
-                                "{ it.label == '%s' }._embedded.stages.find { it.name == '%s'}}.status",scenarioState.currentPipeline(),pipelineLabel,stageName));
-                if(status.contains(expectedStatus)){
-                    return true;
-                }
-                return false;
-            }
-        });
-
-    }
-
-    @com.thoughtworks.gauge.Step("Wait for current status of stage <stageName> to be <expectedStatus>")
-    public void waitForCurrentStatusOfStageToBe(final String stageName, final String expectedStatus) throws Exception {
-
-        Assertions.waitUntil(Timeout.ONE_MINUTE, new Predicate() {
-            public boolean call() throws Exception {
-                String status = getDashboard().then()
-                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances[-1]" +
-                                "._embedded.stages.find { it.name == '%s'}}.status",scenarioState.currentPipeline(),stageName));
-                if(status.contains(expectedStatus)){
-                    return true;
-                }
-                return false;
-            }
-        });
-
-    }
-
-    @com.thoughtworks.gauge.Step("Verify stage <oneBasedIndexOfStage> named <stageName> is <stageStatus> on pipeline with label <pipelineLabel> having stage counter <stageCounter>")
-    public void verifyStageNamedIsOnPipelineWithLabelHavingStageCounter(final Integer oneBasedIndexOfStage, final String stageName,
-                                                                        final String stageStatus, final String pipelineLabel, final int stageCounter) throws Exception {
-        Assertions.waitUntil(Timeout.FIVE_MINUTES, new Predicate() {
-            public boolean call() throws Exception {
-                String status = getDashboard().then()
-                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
-                                "{ it.label == '%s' }._embedded.stages[%s]}.status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
-                String stageCounterLink = getDashboard().then()
-                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
-                                "{ it.label == '%s' }._embedded.stages[%s]}._links.self.href[0]",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
-                String stageLinkForThisCounter = String.format("%s/%s/%s/%s", scenarioState.currentRuntimePipelineName(), pipelineLabel, stageName, stageCounter);
-                if(status.contains(stageStatus) && stageCounterLink.contains(stageLinkForThisCounter)){
-                    return true;
-                }
-                return false;
-            }
-        });
-    }
-
-    @com.thoughtworks.gauge.Step("Wait for first stage to fail with pipeline label <pipelineLabel>")
-    public void waitForFirstStageToFailWithPipelineLabel(String pipelineLabel) throws Exception {
-        verifyStageIsOnPipelineWithLabel(1, "Failed", pipelineLabel);
-    }
-
-    @com.thoughtworks.gauge.Step("Wait for first stage to pass with pipeline label <pipelineLabel>")
-    public void waitForFirstStageToPassWithPipelineLabel(String pipelineLabel) throws Exception {
-        verifyStageIsOnPipelineWithLabel(1, "Passed", pipelineLabel);
-    }
-
-    @com.thoughtworks.gauge.Step("Stop <numberOfJobs> jobs waiting for file to exist - On Pipeline Dashboard Page")
-    public void stopJobsWaitingForFileToExist(int numberOfJobs) throws Exception {
-        scenarioHelper.stopJobsThatAreWaitingForFileToExist(numberOfJobs);
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline <pipelineName> is not visible")
-    public void verifyPipelineIsNotVisible(String pipelineName) throws Exception {
-        ArrayList pipelines = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                        "{ it._embedded.pipelines.find { it.name == '%s'}}.findAll {it != null}",pipelineName));
-        Assert.assertTrue(String.format("Pipeline %s visible on dashboard", pipelineName), pipelines.isEmpty());
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline <pipelineName> is visible")
-    public void verifyPipelineIsVisible(String pipelineName) throws Exception {
-        ArrayList pipelines = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                        "{ it._embedded.pipelines.find { it.name == '%s'}}.findAll {it != null}",pipelineName));
-        Assert.assertFalse(String.format("Pipeline %s NOT visible on dashboard", pipelineName), pipelines.isEmpty());
-    }
-
-    @com.thoughtworks.gauge.Step("Trigger pipeline")
-    public void triggerPipeline() throws Exception {
-        triggerPipelineUsingAPI(scenarioState.currentRuntimePipelineName()).then().statusCode(200);
+    @Override
+    protected String url() {
+        return Urls.urlFor("/dashboard?autoRefresh=" + autoRefresh);
     }
 
 
-    @com.thoughtworks.gauge.Step("Pause pipeline with reason <pauseCause>")
-    public void pausePipelineWithReason(String pauseCause) throws Exception {
-
-        HashMap<String, String> headers = new HashMap<String, String>();
-
-        String user = talkToCruise.currentUserNameProvider.loggedInUser();
-        if (user != null) {
-            String auth = "Basic "+new String(Base64.encode(String.format("%s:badger", user).getBytes()));
-            headers.put("Authorization", auth);
-        }
-
-        headers.put("Accept", pausePipelineAPIVersion);
-        headers.put("Content-Type", "application/json");
-
-
-        RestAssured.given().
-                headers(headers).
-                body(String.format("{\"pause_cause\": \"%s\"}",pauseCause)).
-                when().get(Urls.urlFor(String.format("/go/api/pipelines/%s/pause", scenarioState.currentRuntimePipelineName()))).then().statusCode(200);
+    public void navigateToRunOfPipeline(int counter, String pipelineName) throws Exception {
+        browser.link(String.format("/pipelines\\/%s\\/%s/", scenarioState.pipelineNamed(pipelineName), counter)).click();
+        currentPageState.currentPageIs(Page.PIPELINE_DETAILS);
     }
-
-
-    @com.thoughtworks.gauge.Step("Verify pipeline is unpaused")
-    public void verifyPipelineIsUnpaused() throws Exception {
-        getPipelineStatus(scenarioState.currentRuntimePipelineName()).then().statusCode(200).and().body("paused",Matchers.is(false));
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline is paused with reason <pauseCause> by <pausedBy>")
-    public void verifyPipelineIsPausedWithReasonBy(final String pauseCause, final String pausedBy) throws Exception {
-        Response response = getPipelineStatus(scenarioState.currentRuntimePipelineName());
-        response.then().statusCode(200).and().body("paused",Matchers.is(true));
-        response.then().body("pausedCause",Matchers.is(pauseCause));
-        response.then().body("pausedBy",Matchers.is(pausedBy));
-    }
-
-    private Response getPipelineStatus(String name){
-
-        HashMap<String, String> headers = new HashMap<String, String>();
-
-        String user = talkToCruise.currentUserNameProvider.loggedInUser();
-        if (user != null) {
-            String auth = "Basic "+new String(Base64.encode(String.format("%s:badger", user).getBytes()));
-            headers.put("Authorization", auth);
-        }
-
-        return RestAssured.given().
-                headers(headers).
-                when().get(Urls.urlFor(String.format("/go/api/pipelines/%s/status", name)));
-
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline is paused by <pausedBy>")
-    public void verifyPipelineIsPausedBy(final String pausedBy) throws Exception {
-        Response response = getPipelineStatus(scenarioState.currentRuntimePipelineName());
-        response.then().statusCode(200).and().body("pausedBy",Matchers.is(pausedBy));
-    }
-
-    public void verifyPipelineIsPausedWithReason(String pauseCause) throws Exception {
-        Response response = getPipelineStatus(scenarioState.currentRuntimePipelineName());
-        response.then().statusCode(200).and().body("pausedCause",Matchers.is(pauseCause));
-    }
-
-    @com.thoughtworks.gauge.Step("Verify cannot trigger pipeline")
-    public void verifyCannotTriggerPipeline() throws Exception {
-        Response response = getPipelineStatus(scenarioState.currentRuntimePipelineName());
-        response.then().statusCode(200).and().body("schedulable",Matchers.is(false));
-    }
-
-
-    @com.thoughtworks.gauge.Step("Verify can trigger pipeline")
-    public void verifyCanTriggerPipeline() throws Exception {
-        Response response = getPipelineStatus(scenarioState.currentRuntimePipelineName());
-        response.then().statusCode(200).and().body("schedulable",Matchers.is(true));
-    }
-
-    @com.thoughtworks.gauge.Step("Open trigger with options")
-    public void openTriggerWithOptions() {
-        pipelinePartial.openTriggerWithOptions();
-    }
-
-    @com.thoughtworks.gauge.Step("Unpause pipeline")
-    public void unpausePipeline() throws Exception {
-        HashMap<String, String> headers = new HashMap<String, String>();
-
-        String user = talkToCruise.currentUserNameProvider.loggedInUser();
-        if (user != null) {
-            String auth = "Basic "+new String(Base64.encode(String.format("%s:badger", user).getBytes()));
-            headers.put("Authorization", auth);
-        }
-
-        headers.put("Accept", pausePipelineAPIVersion);
-        headers.put("X-GoCD-Confirm", "true");
-
-
-        RestAssured.given().
-                headers(headers).
-                when().get(Urls.urlFor(String.format("/go/api/pipelines/%s/unpause", scenarioState.currentRuntimePipelineName()))).then().statusCode(200);
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline has no history")
-    public void verifyPipelineHasNoHistory() throws Exception {
-        ArrayList pipelines = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                        "{ it._embedded.pipelines.find { it.name == '%s'}}._embedded.instances[0]",scenarioState.currentRuntimePipelineName()));
-        Assert.assertTrue(String.format("Pipeline %s has History", scenarioState.currentRuntimePipelineName()), pipelines.isEmpty());
-    }
-
-    private ElementStub pipelinePanel() {
-        return browser.div(String.format("pipeline_%s_panel", scenarioState.currentRuntimePipelineName()));
-    }
-
-    @com.thoughtworks.gauge.Step("Verify group <groupName> is visible - On Pipeline Dashboard Page")
-    public void verifyGroupIsVisible(final String groupName) throws Exception {
-        ArrayList groups = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.find { it.name == '%s'}}",groupName));
-        Assert.assertFalse(String.format("Pipeline Group %s NOT visible on dashboard", groupName), groups.isEmpty());
-    }
-
-    @com.thoughtworks.gauge.Step("Verify group <groupName> is not visible")
-    public void verifyGroupIsNotVisible(String groupName) throws Exception {
-        ArrayList groups = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.find { it.name == '%s'}}",groupName));
-        Assert.assertTrue(String.format("Pipeline Group %s visible on dashboard", groupName), groups.isEmpty());
-    }
-
-
-    private ElementStub elementPipeline() {
-        return pipelinePanel();
-    }
-
-
-    @com.thoughtworks.gauge.Step("Trigger pipelines <pipelineNames> and wait for labels <label> to pass")
-    public void triggerPipelinesAndWaitForLabelsToPass(String pipelineNames, String label) throws Exception {
-        triggerPipelinesAndWaitForLabelToPassForStage(pipelineNames, label, "1");
-    }
-
-    @com.thoughtworks.gauge.Step("Trigger pipelines <pipelineNames> and wait for label <label> to pass for stage <stageOneBasedIndex>")
-    public void triggerPipelinesAndWaitForLabelToPassForStage(String pipelineNames, String label, String stageOneBasedIndex) throws Exception {
-        String[] pipelines = pipelineNames.split(",");
-        for (String pipeline : pipelines) {
-            pipeline = pipeline.trim();
-            triggerPipelineUsingAPI(pipeline);
-        }
-        for (String pipeline : pipelines) {
-            pipeline = pipeline.trim();
-            lookingAtPipeline(pipeline);
-            verifyStageIsOnPipelineWithLabel(Integer.parseInt(stageOneBasedIndex), PASSED, label);
-        }
-    }
-
-    @com.thoughtworks.gauge.Step("Wait for labels <label> to pass")
-    public void waitForLabelsToPass(String label) throws Exception {
-        String pipeline = scenarioState.currentRuntimePipelineName();
-        lookingAtPipeline(pipeline);
-        verifyStageIsOnPipelineWithLabel(1, PASSED, label);
-
-    }
-
-    @com.thoughtworks.gauge.Step("Wait for labels <label> to fail")
-    public void waitForLabelsToFail(String label) throws Exception {
-        String pipeline = scenarioState.currentRuntimePipelineName();
-        lookingAtPipeline(pipeline);
-        verifyStageIsOnPipelineWithLabel(1, FAILED, label);
-    }
-
 
     @com.thoughtworks.gauge.Step("Navigate to materials for <pipelineName> <pipelineCounter> <stageName> <stageCounter>")
     public void navigateToMaterialsFor(String pipelineName, String pipelineCounter, String stageName, String stageCounter) throws Exception {
@@ -419,34 +80,10 @@ public class OnPipelineDashboardPage  {
         currentPageState.currentPageIs(CurrentPageState.Page.STAGE_DETAILS);
     }
 
-    @com.thoughtworks.gauge.Step("Verify trigger with option is disabled")
-    public void verifyTriggerWithOptionIsDisabled() throws Exception {
-        verifytriggerWithOptionsIs("true");
-    }
-
-    private void verifytriggerWithOptionsIs(final String disabledBooleanValue) {
-        Assertions.waitUntil(Timeout.ONE_MINUTE, new Predicate() {
-            @Override
-            public boolean call() throws Exception {
-                reloadPage();
-                ElementStub triggerButton = browser.byId(String.format("/deploy-with-options-%s/",
-                        scenarioState.currentRuntimePipelineName()));
-                return !triggerButton.exists() || triggerButton.fetch("disabled").equals(disabledBooleanValue);
-            }
-        });
-    }
-
-    @com.thoughtworks.gauge.Step("Verify trigger with option is enabled")
-    public void verifyTriggerWithOptionIsEnabled() throws Exception {
-        verifytriggerWithOptionsIs("false");
-    }
 
     @com.thoughtworks.gauge.Step("Navigate to stage <stageName> of run <pipelineCounter> having counter <stageCounter>")
     public void navigateToStageOfRunHavingCounter(String stageName, int pipelineCounter, int stageCounter) throws Exception {
-        ElementStub link = browser.link(String.format("/\\/%s\\/%s\\/%s\\/%s(\\?.*)?$/", scenarioState.currentRuntimePipelineName(),
-                pipelineCounter, stageName, stageCounter));
-        link.click();
-        currentPageState.currentPageIs(Page.STAGE_DETAILS);
+        navigateDirectlyToStageOfRunHavingCounter(stageName, pipelineCounter, stageCounter);
     }
 
     /* Do not use a link on the current page. Use to go to an older run, for instance. */
@@ -459,9 +96,7 @@ public class OnPipelineDashboardPage  {
 
     @com.thoughtworks.gauge.Step("Navigate to stage <stageName> of run <pipelineCounter>")
     public void navigateToStageOfRun(String stageName, int pipelineCounter) throws Exception {
-        ElementStub stageLink = browser.link(String.format("/%s/", stageName)).in(
-                browser.div("pipeline_instance_details").in(elementPipeline()));
-        stageLink.click();
+        navigateDirectlyToStageOfRunHavingCounter(stageName, pipelineCounter, 1);
         currentPageState.currentPageIs(Page.STAGE_DETAILS);
     }
 
@@ -499,40 +134,6 @@ public class OnPipelineDashboardPage  {
         super.verifyCruiseFooter();
     }
 
-    @com.thoughtworks.gauge.Step("Trigger the pipeline <times> times starting at counter <startingAtCounter>")
-    public void triggerThePipelineTimesStartingAtCounter(Integer times, Integer startingAtCounter) throws Exception {
-        for (int i = 0; i < times; i++) {
-            startingAtCounter++;
-            triggerPipeline();
-            verifyStageIsOnPipelineWithLabel(1, PASSED, startingAtCounter.toString());
-        }
-    }
-
-    @com.thoughtworks.gauge.Step("Open changes section for counter <counter>")
-    public void openChangesSectionForCounter(final int counter) throws Exception {
-        Assertions.waitUntil(Timeout.TWENTY_SECONDS, new Predicate() {
-            @Override
-            public boolean call() throws Exception {
-                ElementStub showChangesElement = browser.byId(String.format("show_changes_%s_%s",
-                        scenarioState.currentRuntimePipelineName(), counter));
-                if (!showChangesElement.exists())
-                    return false;
-                showChangesElement.click();
-                return true;
-            }
-        });
-    }
-
-    @com.thoughtworks.gauge.Step("Open pipelines selector")
-    public void openPipelinesSelector() throws Exception {
-        Assertions.waitUntil(Timeout.TWENTY_SECONDS, new Predicate() {
-            @Override
-            public boolean call() throws Exception {
-                browser.byId("show_pipelines_selector").click();
-                return true;
-            }
-        });
-    }
 
     @com.thoughtworks.gauge.Step("Navigate to pipeline dependencies for <pipelineName> <pipelineCounter> <stageName> <stageCounter>")
     public void navigateToPipelineDependenciesFor(String pipelineName, String pipelineCounter, String stageName, String stageCounter)
@@ -546,148 +147,12 @@ public class OnPipelineDashboardPage  {
         super.logout();
     }
 
-    private boolean isButtonDisabled(ElementStub element) {
-        return element.fetch("disabled").equals(true);
-    }
-
-    private ElementStub elementTriggerButton(final String pipelineName) {
-        return browser.submit(String.format("deploy-%s", pipelineName));
-    }
-
-    private boolean assertTriggerAcceptedMessage(final String pipelineName) {
-        ElementStub triggerMessage = browser.byId(String.format("trigger-result-%s", pipelineName));
-        return triggerMessage.getText().contains(String.format("Request to schedule pipeline %s accepted", pipelineName));
-    }
-
-    @com.thoughtworks.gauge.Step("Verify the lock status is <lockStatus> - On Pipeline Dashboard Page")
-    public void verifyTheLockStatusIs(final String lockStatus) throws Exception {
-        Assertions.waitUntil(Timeout.FIVE_SECONDS, new Predicate() {
-            public boolean call() throws Exception {
-                reloadPage();
-                ElementStub element = browser.byXPath(String.format("//span[contains(@class,'%s')]", lockStatus));
-                return element.exists();
-            }
-        });
-    }
-
-    @com.thoughtworks.gauge.Step("Unlock the pipeline - On Pipeline Dashboard Page")
-    public void unlockThePipeline() throws Exception {
-        Assertions.waitFor(Timeout.FIVE_SECONDS, new Function<ElementStub>() {
-            public ElementStub call() {
-                return browser.byXPath("//span[contains(@class, 'click_to_unlock')]/a");
-            }
-        }).click();
-    }
-
-    @com.thoughtworks.gauge.Step("Click compare link")
-    public void clickCompareLink() throws Exception {
-        ElementStub link = browser.link("Compare").in(browser.div("pipeline_" + scenarioState.currentRuntimePipelineName() + "_panel"));
-        link.click();
-        currentPageState.currentPageIs(Page.COMPARE_PAGE);
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline is at label <label> and does not get triggered")
-    public void verifyPipelineIsAtLabelAndDoesNotGetTriggered(final int label) throws Exception {
-        Assertions.assertOverTime(Timeout.TEN_SECONDS, new Function<Boolean>() {
-            public Boolean call() {
-                return elementPipelineLabel(String.valueOf(label)).exists();
-            }
-        });
-    }
-
-    private ElementStub elementPipelineLabel(final String pipelineLabel) {
-        return browser.div("Instance: " + pipelineLabel).in(pipelinePanel());
-    }
-
-    @com.thoughtworks.gauge.Step("Verify current pipeline has label with counter <pipelineCounter> concatenated with value in store with key <key>")
-    public void verifyCurrentPipelineHasLabelWithCounterConcatenatedWithValueInStoreWithKey(String pipelineCounter, String key)
-            throws Exception {
-        String expectedLabel = String.format("%s-%s", pipelineCounter, scenarioState.getValueFromStore(key));
-        ElementStub labelContainer = browser.div("label").in(pipelinePanel());
-        ElementStub labelLink = browser.link(expectedLabel).in(labelContainer);
-        assertThat(String.format("Could not find link named %s", expectedLabel), labelLink.exists(), Is.is(true));
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline does not get triggered even once")
-    public void verifyPipelineDoesNotGetTriggeredEvenOnce() {
-        Assert.assertThat(pipelineStatusMessage(), Is.is("No historical data"));
-        Assertions.assertOverTime(Timeout.TEN_SECONDS, new Function<Boolean>() {
-            public Boolean call() {
-                if ("No historical data".equals(pipelineStatusMessage())) {
-                    return true;
-                }
-                return false;
-            }
-        });
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline has not been triggered even once")
-    public void verifyPipelineHasNotBeenTriggeredEvenOnce() {
-        Assert.assertThat(pipelineStatusMessage(), Is.is("No historical data"));
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline is not getting triggered and stays at run <initialPipelineLabel>")
-    public void verifyPipelineIsNotGettingTriggeredAndStaysAtRun(final String initialPipelineLabel) throws Exception {
-        Assertions.assertOverTime(Timeout.TEN_SECONDS, new Function<Boolean>() {
-            public Boolean call() {
-                reloadPage();
-                boolean stageIsPassed = cssClassOfStageBar(1, initialPipelineLabel).contains("Passed");
-                boolean labelIsSameAsInitialOne = elementPipelineLabel(initialPipelineLabel).exists(true);
-
-                if (stageIsPassed && labelIsSameAsInitialOne) {
-                    return true;
-                }
-                return false;
-            }
-        });
-    }
-
-    @com.thoughtworks.gauge.Step("Trigger stage <stageNumber> of pipeline <pipelineName> with a _ run _ till _ file _ exists _ job <numberOfJobs> and wait for label <label> to be <status>")
-    public void triggerStageOfPipelineWithA_Run_Till_File_Exists_JobAndWaitForLabelToBe(Integer stageNumber, String pipelineName,
-                                                                                        int numberOfJobs, String label, String status) throws Exception {
-        triggerPipeline(pipelineName);
-        completePipelineRun(stageNumber, numberOfJobs, label, status);
-    }
-
-    @com.thoughtworks.gauge.Step("Trigger pipeline <pipelineName>")
-    public void triggerPipeline(String pipelineName) throws Exception {
-        lookingAtPipeline(pipelineName);
-        triggerPipeline();
-    }
-
-    public void verifyStageWithA_Run_Till_File_Exists_JobOfPipelineHasWithLabel(Integer stageNumber, Integer numberOfJobs, String pipelineName,
-                                                                                String status, String label) throws Exception {
-        lookingAtPipeline(pipelineName);
-        completePipelineRun(stageNumber, numberOfJobs, label, status);
-    }
-
-    @com.thoughtworks.gauge.Step("Verify pipeline <pipeline> is triggered by <user>")
-    public void verifyPipelineIsTriggeredBy(String pipeline, String user) {
-        assertTrue(browser.div("schedule_time").in(browser.div("pipeline_" + scenarioState.pipelineNamed(pipeline) + "_panel")).getText().contains("Triggered by " + user));
-    }
 
     @com.thoughtworks.gauge.Step("Verify user <user> is logged in")
     public void verifyUserIsLoggedIn(String user) {
         System.out.println("current_user" + browser.listItem("current_user icon").getText());
     }
 
-    public void verifyTriggerButtonIsPresent() throws Exception {
-        browserWrapper.reload();
-        ElementStub triggerButton = triggerButton(scenarioState.currentRuntimePipelineName());
-        boolean isTriggerButtonDisabled = triggerButton.fetch("disabled").equals("true");
-        boolean triggerButtonExists = triggerButton.exists() && !isTriggerButtonDisabled;
-        Assert.assertThat(triggerButtonExists, Is.is(true));
-
-    }
-
-    public void verifyTriggerWithOptionsButtonIsPresent() throws Exception {
-        reloadPage();
-        ElementStub triggerWithOptionsButton = browser.byId(String.format("deploy-with-options-%s",
-                scenarioState.currentRuntimePipelineName()));
-        boolean isTriggerWithOptionsButtonDisabled = triggerWithOptionsButton.fetch("disabled").equals("true");
-        boolean triggerWithOptionsButtonExists = triggerWithOptionsButton.exists() && !isTriggerWithOptionsButtonDisabled;
-        Assert.assertThat(triggerWithOptionsButtonExists, Is.is(true));
-    }
 
     @com.thoughtworks.gauge.Step("Navigate to admin templates tab")
     public void navigateToAdminTemplatesTab() {
@@ -701,23 +166,6 @@ public class OnPipelineDashboardPage  {
         Assert.assertThat(browser.link("Templates").exists(), Is.is(false));
     }
 
-    @com.thoughtworks.gauge.Step("Trigger and cancel pipeline <pipelineName> <times> times")
-    public void triggerAndCancelPipelineTimes(String pipelineName, Integer times) throws Exception {
-        triggerAndCancelPipelineTimesStartingWithLabel(pipelineName, times, 0);
-    }
-
-    @com.thoughtworks.gauge.Step("Trigger and cancel <pipelineName> pipeline <times> times starting with label <startLabel>")
-    public void triggerAndCancelPipelineTimesStartingWithLabel(String pipelineName, Integer times, int startLabel) throws Exception {
-        for (int i = 1; i <= times; i++) {
-            triggerPipeline(pipelineName);
-            int pipelineCounter = i + startLabel;
-            String label = String.valueOf(pipelineCounter);
-            verifyStageIsOnPipelineWithLabel(1, "Building", label);
-            cancelStageOfThePipelineWithLabel(1, label, pipelineCounter);
-            verifyStageIsOnPipelineWithLabel(1, "Cancelled", label);
-        }
-    }
-
     @com.thoughtworks.gauge.Step("Rerun stage <stageName> for current pipeline having pipeline label <pipelineLabel>")
     public void rerunStageForCurrentPipelineHavingPipelineLabel(String stageName, Integer pipelineLabel) throws Exception {
         navigateToStageOfRun(stageName, pipelineLabel);
@@ -729,64 +177,16 @@ public class OnPipelineDashboardPage  {
     @com.thoughtworks.gauge.Step("Navigate to the pipeline history page for pipeline <pipelineName>")
     public void navigateToThePipelineHistoryPageForPipeline(String pipelineName) throws Exception {
         String dynamicPipelineName = scenarioState.pipelineNamed(pipelineName);
-        browser.link(dynamicPipelineName).in(browser.div("pipeline_" + dynamicPipelineName + "_panel")).click();
-        assertThat(browser.fetch("document.title"), StringContains.containsString("Pipeline Activity"));
+        navigateToPipelineHistoryPageOf(dynamicPipelineName);
         currentPageState.currentPageIs(CurrentPageState.Page.PIPELINE_HISTORY);
     }
 
-    private String pipelineStatusMessage() {
-        return browser.span("message").in(pipelineElement()).getText().trim();
+    @com.thoughtworks.gauge.Step("Click compare link")
+    public void clickCompareLink() throws Exception {
+        ElementStub link = browser.link("Compare").in(browser.div("pipeline_" + scenarioState.currentRuntimePipelineName() + "_panel"));
+        link.click();
+        currentPageState.currentPageIs(Page.COMPARE_PAGE);
     }
 
-    private ElementStub pipelineElement() {
-        return browser.div("pipeline_" + scenarioState.pipelineNamed(scenarioState.currentPipeline()) + "_panel");
-    }
 
-    private void completePipelineRun(Integer stageNumber, Integer numberOfJobs, String label, String status) throws Exception {
-        scenarioHelper.deleteStopjobFileOnAllAgents();
-        if (PASSED.equals(status))
-            scenarioHelper.stopJobsThatAreWaitingForFileToExist(numberOfJobs);
-        else
-            scenarioHelper.failJobsThatAreWaitingForFileToExist(numberOfJobs);
-        verifyStageIsOnPipelineWithLabel(stageNumber, status, label);
-    }
-
-    private void cancelStageOfThePipelineWithLabel(int oneBasedStageIndex, String pipelineLabel, int pipelineCounter) throws Exception {
-        String stageName = stageName(pipelineLabel, oneBasedStageIndex);
-        navigateToStageOfRun(stageName, pipelineCounter);
-        AlreadyOnStageDetailPage alreadyOnStageDetailPage = new AlreadyOnStageDetailPage(currentPageState, scenarioState, repositoryState, browser, talkToCruise);
-        alreadyOnStageDetailPage.cancel(stageName);
-        navigateToURL();
-    }
-
-    private String stageName(final String pipelineLabel, final int oneBasedStageIndex) {
-        return Assertions.waitFor(Timeout.THIRTY_SECONDS, new Function<String>() {
-            @Override
-            public String call() {
-                try {
-                    ElementStub stageBarElement = browser.div(String.format("/stage_bar /[%d]", oneBasedStageIndex - 1)).near(elementPipelineLabel(pipelineLabel));
-                    return ElementUtil.getAttribute(stageBarElement, "data-stage");
-                } catch (RuntimeException e) {
-                    reloadPage();
-                    throw e;
-                }
-            }
-        });
-    }
-
-    private String currentPipeline() {
-        return scenarioState.currentPipeline();
-    }
-
-    private String stageStateOnPipelineLabel(){
-        getDashboard().then().body()
-    }
-
-    private String cssClassOfStageBar(final Integer oneBasedIndexOfStage, final String pipelineLabel) {
-        return stageBarElementForStage(oneBasedIndexOfStage, pipelineLabel).fetch("className");
-    }
-
-    private ElementStub stageBarElementForStage(final Integer oneBasedIndexOfStage, final String pipelineLabel) {
-        return browser.div(String.format("/stage_bar /[%d]", oneBasedIndexOfStage - 1)).near(elementPipelineLabel(pipelineLabel));
-    }
 }
