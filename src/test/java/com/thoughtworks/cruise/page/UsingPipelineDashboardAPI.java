@@ -18,34 +18,27 @@ package com.thoughtworks.cruise.page;
 
 import com.jayway.restassured.RestAssured;
 import com.jayway.restassured.response.Response;
-import org.hamcrest.Matchers;
-import com.thoughtworks.cruise.Regex;
 import com.thoughtworks.cruise.Urls;
 import com.thoughtworks.cruise.client.TalkToCruise;
 import com.thoughtworks.cruise.context.Configuration;
 import com.thoughtworks.cruise.state.CurrentPageState;
-import com.thoughtworks.cruise.state.CurrentPageState.Page;
 import com.thoughtworks.cruise.state.RepositoryState;
 import com.thoughtworks.cruise.state.ScenarioState;
-import com.thoughtworks.cruise.util.ElementUtil;
 import com.thoughtworks.cruise.utils.Assertions;
 import com.thoughtworks.cruise.utils.Assertions.Function;
 import com.thoughtworks.cruise.utils.Assertions.Predicate;
 import com.thoughtworks.cruise.utils.ScenarioHelper;
 import com.thoughtworks.cruise.utils.Timeout;
-import net.sf.sahi.client.ElementStub;
 import org.bouncycastle.util.encoders.Base64;
+import org.hamcrest.Matchers;
 import org.hamcrest.core.Is;
-import org.hamcrest.text.StringContains;
 import org.junit.Assert;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 import static junit.framework.Assert.assertTrue;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 
@@ -57,10 +50,9 @@ public class UsingPipelineDashboardAPI  {
     private final ScenarioState scenarioState;
 
     private final ScenarioHelper scenarioHelper;
-    private final PipelinePartial pipelinePartial;
     private final TalkToCruise talkToCruise;
     private final Configuration configuration;
-    private String dashboardApiVersion= "application/vnd.go.cd.v1+json";
+    private String dashboardApiVersion= "application/vnd.go.cd.v2+json";
     private String triggerPipelineAPIVersion= "application/vnd.go.cd.v1+json";
     private String pausePipelineAPIVersion= "application/vnd.go.cd.v1+json";
     private String buildCauseAPIVersion = "application/vnd.go.cd.v1+json";
@@ -78,7 +70,6 @@ public class UsingPipelineDashboardAPI  {
         this.configuration = configuration;
         this.scenarioHelper = scenarioHelper;
         this.repositoryState = repositoryState;
-        this.pipelinePartial = new PipelinePartial(scenarioState);
     }
 
     private Response getDashboard(){
@@ -137,19 +128,18 @@ public class UsingPipelineDashboardAPI  {
     public void verifyPipelineIsInGroup(String pipelineGroupName) throws Exception {
         scenarioState.getDashboardResponse().then()
                 .body(String.format("_embedded.pipeline_groups.find " +
-                        "{it.name == '%s'}._embedded.pipelines.find { it.name == '%s'}.name"
-                        ,pipelineGroupName,scenarioState.currentPipeline()), is(scenarioState.currentPipeline()));
+                        "{it.name == '%s'}.pipelines"
+                        ,pipelineGroupName), hasItem(scenarioState.currentRuntimePipelineName()));
     }
-
 
 
     @com.thoughtworks.gauge.Step("Verify stage <oneBasedIndexOfStage> is <stageStatus> on pipeline with label <pipelineLabel>")
     public void verifyStageIsOnPipelineWithLabel(final Integer oneBasedIndexOfStage, final String stageStatus, final String pipelineLabel) throws Exception {
 
         scenarioState.getDashboardResponse().then()
-                .body(String.format("_embedded.pipeline_groups.collect " +
-                        "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
-                        "{ it.label == '%s' }._embedded.stages[%s]}.status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)), is(stageStatus));
+                .body(String.format("_embedded.pipelines.find " +
+                        "{ it.name == '%s'}._embedded.instances.find " +
+                        "{ it.label == '%s' }._embedded.stages[%s].status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)), is(stageStatus));
     }
 
     @com.thoughtworks.gauge.Step("Wait for stage <stageName> status to be <expectedStatus> with label <pipelineLabel>")
@@ -158,9 +148,9 @@ public class UsingPipelineDashboardAPI  {
         Assertions.waitUntil(Timeout.FIVE_MINUTES, new Predicate() {
             public boolean call() throws Exception {
                 String status = getDashboard().then()
-                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
-                                "{ it.label == '%s' }._embedded.stages.find { it.name == '%s'}}.status",scenarioState.currentPipeline(),pipelineLabel,stageName));
+                        .extract().path(String.format("_embedded.pipelines.find " +
+                                "{ it.name == '%s'}._embedded.instances.find " +
+                                "{ it.label == '%s' }._embedded.stages.find { it.name == '%s'}.status",scenarioState.currentPipeline(),pipelineLabel,stageName));
                 if(status.contains(expectedStatus)){
                     return true;
                 }
@@ -176,9 +166,9 @@ public class UsingPipelineDashboardAPI  {
         Assertions.waitUntil(Timeout.ONE_MINUTE, new Predicate() {
             public boolean call() throws Exception {
                 String status = getDashboard().then()
-                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances[-1]" +
-                                "._embedded.stages.find { it.name == '%s'}}.status",scenarioState.currentPipeline(),stageName));
+                        .extract().path(String.format("_embedded.pipelines.find " +
+                                "{ it.name == '%s'}._embedded.instances[-1]" +
+                                "._embedded.stages.find { it.name == '%s'}.status",scenarioState.currentPipeline(),stageName));
                 if(status.contains(expectedStatus)){
                     return true;
                 }
@@ -194,13 +184,13 @@ public class UsingPipelineDashboardAPI  {
         Assertions.waitUntil(Timeout.FIVE_MINUTES, new Predicate() {
             public boolean call() throws Exception {
                 String status = getDashboard().then()
-                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
-                                "{ it.label == '%s' }._embedded.stages[%s]}.status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
+                        .extract().path(String.format("_embedded.pipelines.find " +
+                                "{ it.name == '%s'}._embedded.instances.find " +
+                                "{ it.label == '%s' }._embedded.stages[%s].status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
                 String stageCounterLink = getDashboard().then()
-                        .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                                "{ it._embedded.pipelines.find { it.name == '%s'}._embedded.instances.find " +
-                                "{ it.label == '%s' }._embedded.stages[%s]}._links.self.href[0]",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
+                        .extract().path(String.format("_embedded.pipelines.find " +
+                                "{ it.name == '%s'}._embedded.instances.find " +
+                                "{ it.label == '%s' }._embedded.stages[%s]._links.self.href[0]",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
                 String stageLinkForThisCounter = String.format("%s/%s/%s/%s", scenarioState.currentRuntimePipelineName(), pipelineLabel, stageName, stageCounter);
                 if(status.contains(stageStatus) && stageCounterLink.contains(stageLinkForThisCounter)){
                     return true;
@@ -228,16 +218,16 @@ public class UsingPipelineDashboardAPI  {
     @com.thoughtworks.gauge.Step("Verify pipeline <pipelineName> is not visible")
     public void verifyPipelineIsNotVisible(String pipelineName) throws Exception {
         ArrayList pipelines = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                        "{ it._embedded.pipelines.find { it.name == '%s'}}.findAll {it != null}",pipelineName));
+                .extract().path(String.format("_embedded.pipelines.find " +
+                        "{ it.name == '%s'}.findAll {it != null}",pipelineName));
         Assert.assertTrue(String.format("Pipeline %s visible on dashboard", pipelineName), pipelines.isEmpty());
     }
 
     @com.thoughtworks.gauge.Step("Verify pipeline <pipelineName> is visible")
     public void verifyPipelineIsVisible(String pipelineName) throws Exception {
         ArrayList pipelines = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                        "{ it._embedded.pipelines.find { it.name == '%s'}}.findAll {it != null}",pipelineName));
+                .extract().path(String.format("_embedded.pipelines.find " +
+                        "{ it.name == '%s'}.findAll {it != null}",pipelineName));
         Assert.assertFalse(String.format("Pipeline %s NOT visible on dashboard", pipelineName), pipelines.isEmpty());
     }
 
@@ -282,6 +272,20 @@ public class UsingPipelineDashboardAPI  {
         response.then().body("pausedBy",Matchers.is(pausedBy));
     }
 
+    public boolean verifyCanOperatePipeline() throws Exception {
+        return getDashboard().then()
+                .extract().path(String.format("_embedded.pipelines.find " +
+                        "{ it.name == '%s'}.can_operate",scenarioState.currentRuntimePipelineName()));
+    }
+
+    public void verifyTriggerButtonIsPresent() throws Exception {
+        Assert.assertThat(verifyCanOperatePipeline(), Is.is(true));
+    }
+
+    public void verifyTriggerWithOptionsButtonIsPresent() throws Exception {
+        Assert.assertThat(verifyCanOperatePipeline(), Is.is(true));
+    }
+
     private Response getPipelineStatus(String name){
 
         HashMap<String, String> headers = new HashMap<String, String>();
@@ -311,20 +315,22 @@ public class UsingPipelineDashboardAPI  {
 
     @com.thoughtworks.gauge.Step("Verify cannot trigger pipeline")
     public void verifyCannotTriggerPipeline() throws Exception {
-        Response response = getPipelineStatus(scenarioState.currentRuntimePipelineName());
-        response.then().statusCode(200).and().body("schedulable",Matchers.is(false));
+        Assert.assertTrue(verifyCanOperatePipeline());
     }
 
 
     @com.thoughtworks.gauge.Step("Verify can trigger pipeline")
     public void verifyCanTriggerPipeline() throws Exception {
-        Response response = getPipelineStatus(scenarioState.currentRuntimePipelineName());
-        response.then().statusCode(200).and().body("schedulable",Matchers.is(true));
+        Assert.assertTrue(verifyCanOperatePipeline());
+    }
+
+    @com.thoughtworks.gauge.Step("Verify trigger with option is enabled")
+    public void verifyCanTriggerPipelineWithOptions() throws Exception {
+        Assert.assertTrue(verifyCanOperatePipeline());
     }
 
     @com.thoughtworks.gauge.Step("Open trigger with options")
     public void openTriggerWithOptions() {
-        pipelinePartial.openTriggerWithOptions();
     }
 
     @com.thoughtworks.gauge.Step("Unpause pipeline")
@@ -348,10 +354,13 @@ public class UsingPipelineDashboardAPI  {
 
     @com.thoughtworks.gauge.Step("Verify pipeline has no history")
     public void verifyPipelineHasNoHistory() throws Exception {
-        ArrayList pipelines = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.collect " +
-                        "{ it._embedded.pipelines.find { it.name == '%s'}}._embedded.instances[0]",scenarioState.currentRuntimePipelineName()));
-        Assert.assertTrue(String.format("Pipeline %s has History", scenarioState.currentRuntimePipelineName()), pipelines.isEmpty());
+        Assert.assertTrue(String.format("Pipeline %s has History", scenarioState.currentRuntimePipelineName()), getAllPipelineInstances().isEmpty());
+    }
+
+    private ArrayList getAllPipelineInstances(){
+        return getDashboard().then()
+                .extract().path(String.format("_embedded.pipelines.find " +
+                        "{ it.name == '%s'}._embedded.instances[0]",scenarioState.currentRuntimePipelineName()));
     }
 
     @com.thoughtworks.gauge.Step("Verify group <groupName> is visible - On Pipeline Dashboard Page")
@@ -436,59 +445,45 @@ public class UsingPipelineDashboardAPI  {
     }
 
 
-
-
     @com.thoughtworks.gauge.Step("Verify pipeline is at label <label> and does not get triggered")
     public void verifyPipelineIsAtLabelAndDoesNotGetTriggered(final int label) throws Exception {
         Assertions.assertOverTime(Timeout.TEN_SECONDS, new Function<Boolean>() {
             public Boolean call() {
-                return elementPipelineLabel(String.valueOf(label)).exists();
+                return pipelineIsAtLabel(label);
             }
         });
+    }
+
+    private boolean pipelineIsAtLabel(int label){
+
+        ArrayList labels = getDashboard().then()
+                                      .extract().path(String.format("_embedded.pipelines.find " +
+                                      "{ it.name == '%s'}._embedded.instances[-1].label",scenarioState.currentRuntimePipelineName()));
+        return labels.contains(label);
+
     }
 
     @com.thoughtworks.gauge.Step("Verify current pipeline has label with counter <pipelineCounter> concatenated with value in store with key <key>")
     public void verifyCurrentPipelineHasLabelWithCounterConcatenatedWithValueInStoreWithKey(String pipelineCounter, String key)
             throws Exception {
         String expectedLabel = String.format("%s-%s", pipelineCounter, scenarioState.getValueFromStore(key));
-        ElementStub labelContainer = browser.div("label").in(pipelinePanel());
-        ElementStub labelLink = browser.link(expectedLabel).in(labelContainer);
-        assertThat(String.format("Could not find link named %s", expectedLabel), labelLink.exists(), Is.is(true));
+        assertThat(String.format("Could not find link named %s", expectedLabel), pipelineIsAtLabel(Integer.valueOf(expectedLabel)), Is.is(true));
     }
 
     @com.thoughtworks.gauge.Step("Verify pipeline does not get triggered even once")
     public void verifyPipelineDoesNotGetTriggeredEvenOnce() {
-        Assert.assertThat(pipelineStatusMessage(), Is.is("No historical data"));
         Assertions.assertOverTime(Timeout.TEN_SECONDS, new Function<Boolean>() {
             public Boolean call() {
-                if ("No historical data".equals(pipelineStatusMessage())) {
-                    return true;
-                }
-                return false;
+                return getAllPipelineInstances().isEmpty();
             }
         });
     }
 
     @com.thoughtworks.gauge.Step("Verify pipeline has not been triggered even once")
     public void verifyPipelineHasNotBeenTriggeredEvenOnce() {
-        Assert.assertThat(pipelineStatusMessage(), Is.is("No historical data"));
+        getAllPipelineInstances().isEmpty();
     }
 
-    @com.thoughtworks.gauge.Step("Verify pipeline is not getting triggered and stays at run <initialPipelineLabel>")
-    public void verifyPipelineIsNotGettingTriggeredAndStaysAtRun(final String initialPipelineLabel) throws Exception {
-        Assertions.assertOverTime(Timeout.TEN_SECONDS, new Function<Boolean>() {
-            public Boolean call() {
-                reloadPage();
-                boolean stageIsPassed = cssClassOfStageBar(1, initialPipelineLabel).contains("Passed");
-                boolean labelIsSameAsInitialOne = elementPipelineLabel(initialPipelineLabel).exists(true);
-
-                if (stageIsPassed && labelIsSameAsInitialOne) {
-                    return true;
-                }
-                return false;
-            }
-        });
-    }
 
     @com.thoughtworks.gauge.Step("Trigger stage <stageNumber> of pipeline <pipelineName> with a _ run _ till _ file _ exists _ job <numberOfJobs> and wait for label <label> to be <status>")
     public void triggerStageOfPipelineWithA_Run_Till_File_Exists_JobAndWaitForLabelToBe(Integer stageNumber, String pipelineName,
@@ -511,7 +506,10 @@ public class UsingPipelineDashboardAPI  {
 
     @com.thoughtworks.gauge.Step("Verify pipeline <pipeline> is triggered by <user>")
     public void verifyPipelineIsTriggeredBy(String pipeline, String user) {
-        assertTrue(browser.div("schedule_time").in(browser.div("pipeline_" + scenarioState.pipelineNamed(pipeline) + "_panel")).getText().contains("Triggered by " + user));
+        ArrayList triggered_by_uer = getDashboard().then()
+                .extract().path(String.format("_embedded.pipelines.find " +
+                        "{ it.name == '%s'}._embedded.instances[-1].triggered_by",scenarioState.currentRuntimePipelineName()));
+        assertTrue("Triggered by user is not as expected.", triggered_by_uer.contains(user));
     }
 
 
@@ -545,10 +543,22 @@ public class UsingPipelineDashboardAPI  {
 
     private void cancelStageOfThePipelineWithLabel(int oneBasedStageIndex, String pipelineLabel, int pipelineCounter) throws Exception {
         String stageName = stageName(pipelineLabel, oneBasedStageIndex);
-        navigateToStageOfRun(stageName, pipelineCounter);
-        AlreadyOnStageDetailPage alreadyOnStageDetailPage = new AlreadyOnStageDetailPage(currentPageState, scenarioState, repositoryState, browser, talkToCruise);
-        alreadyOnStageDetailPage.cancel(stageName);
-        navigateToURL();
+
+        HashMap<String, String> headers = new HashMap<String, String>();
+
+        String user = talkToCruise.currentUserNameProvider.loggedInUser();
+        if (user != null) {
+            String auth = "Basic "+new String(Base64.encode(String.format("%s:badger", user).getBytes()));
+            headers.put("Authorization", auth);
+        }
+
+        headers.put("Confirm", "true");
+
+         RestAssured.given().
+                headers(headers).
+                when().post(Urls.urlFor(String.format("/go/api/stages/%s/%s/cancel",scenarioState.currentRuntimePipelineName(),stageName))).
+                 then().statusCode(200);
+
     }
 
     private String stageName(final String pipelineLabel, final int oneBasedStageIndex) {
@@ -556,10 +566,12 @@ public class UsingPipelineDashboardAPI  {
             @Override
             public String call() {
                 try {
-                    ElementStub stageBarElement = browser.div(String.format("/stage_bar /[%d]", oneBasedStageIndex - 1)).near(elementPipelineLabel(pipelineLabel));
-                    return ElementUtil.getAttribute(stageBarElement, "data-stage");
+                    ArrayList<String> stageName = getDashboard().then()
+                                                    .extract().path(String.format("_embedded.pipelines.find " +
+                                                    "{ it.name == '%s'}._embedded.instances.find { it.label == '%s'}" +
+                                                    "._embedded.stages[%d].name",scenarioState.currentRuntimePipelineName(),pipelineLabel,oneBasedStageIndex-1));
+                    return stageName.get(0);
                 } catch (RuntimeException e) {
-                    reloadPage();
                     throw e;
                 }
             }
