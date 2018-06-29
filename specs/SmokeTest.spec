@@ -96,7 +96,7 @@ Moving Preferences page valdiations to ruby functional tests since SPAs are not 
 * Verify jobs shows "Failed: 0" collapsed
 * Verify jobs shows "Passed: 1" open with jobs "default.job"
 * Verify jobs shows "In Progress: 0" collapsed
-* Navigate to pipeline dashboard page
+ Navigate to pipeline dashboard page
 
 * Looking at pipeline "run.till.file.exists" - Already On Pipeline Dashboard Page
 * Verify pipeline is in group "group.with.dot" - Already On Pipeline Dashboard Page

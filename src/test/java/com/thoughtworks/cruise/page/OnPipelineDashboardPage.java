@@ -44,6 +44,7 @@ public class OnPipelineDashboardPage extends CruisePage {
     private final Configuration configuration;
     private boolean autoRefresh = false;
     private final RepositoryState repositoryState;
+    private final UsingPipelineDashboardAPI dashboardApi;
 
     public OnPipelineDashboardPage(ScenarioState scenarioState, CurrentPageState currentPageState, ScenarioHelper scenarioHelper,
                                    Browser browser, TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
@@ -59,6 +60,7 @@ public class OnPipelineDashboardPage extends CruisePage {
         this.configuration = configuration;
         this.scenarioHelper = scenarioHelper;
         this.repositoryState = repositoryState;
+        this.dashboardApi = new UsingPipelineDashboardAPI(scenarioState, currentPageState, scenarioHelper, false, talkToCruise, configuration, repositoryState);
     }
 
 
