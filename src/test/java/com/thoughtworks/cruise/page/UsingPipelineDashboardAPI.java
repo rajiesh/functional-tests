@@ -135,11 +135,19 @@ public class UsingPipelineDashboardAPI  {
 
     @com.thoughtworks.gauge.Step("Verify stage <oneBasedIndexOfStage> is <stageStatus> on pipeline with label <pipelineLabel>")
     public void verifyStageIsOnPipelineWithLabel(final Integer oneBasedIndexOfStage, final String stageStatus, final String pipelineLabel) throws Exception {
+        Assertions.waitUntil(Timeout.FIVE_MINUTES, new Predicate() {
+            public boolean call() throws Exception {
+                String status = scenarioState.getDashboardResponse().then()
+                        .extract().path(String.format("_embedded.pipelines.find " +
+                                "{ it.name == '%s'}._embedded.instances.find " +
+                                "{ it.label == '%s' }._embedded.stages[%s].status", scenarioState.currentPipeline(), pipelineLabel, String.valueOf(oneBasedIndexOfStage - 1)));
+                if (status.contains(stageStatus)) {
+                    return true;
+                }
+                return false;
 
-        scenarioState.getDashboardResponse().then()
-                .body(String.format("_embedded.pipelines.find " +
-                        "{ it.name == '%s'}._embedded.instances.find " +
-                        "{ it.label == '%s' }._embedded.stages[%s].status",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)), is(stageStatus));
+            }
+        });
     }
 
     @com.thoughtworks.gauge.Step("Wait for stage <stageName> status to be <expectedStatus> with label <pipelineLabel>")
