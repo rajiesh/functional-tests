@@ -19,7 +19,6 @@ package com.thoughtworks.cruise.page;
 import com.thoughtworks.cruise.client.TalkToCruise;
 import com.thoughtworks.cruise.context.Configuration;
 import com.thoughtworks.cruise.state.CurrentPageState;
-import com.thoughtworks.cruise.state.CurrentPageState.Page;
 import com.thoughtworks.cruise.state.RepositoryState;
 import com.thoughtworks.cruise.state.ScenarioState;
 import com.thoughtworks.cruise.utils.ScenarioHelper;
@@ -33,7 +32,7 @@ public class AlreadyOnPipelineDashboardPage extends OnPipelineDashboardPage {
 			TalkToCruise talkToCruise, Configuration configuration, RepositoryState repositoryState) {
 		super(scenarioState, currentPageState, scenarioHelper, true, browser, talkToCruise, configuration, repositoryState);
 		this.dashboardApi = new UsingPipelineDashboardAPI(scenarioState, currentPageState, scenarioHelper, false, talkToCruise, configuration, repositoryState);
-		currentPageState.assertCurrentPageIs(Page.PIPELINE_DASHBOARD);
+		//currentPageState.assertCurrentPageIs(Page.PIPELINE_DASHBOARD);
 	}
 
 	@com.thoughtworks.gauge.Step("Looking at pipeline <pipelineName> - Already On Pipeline Dashboard Page")

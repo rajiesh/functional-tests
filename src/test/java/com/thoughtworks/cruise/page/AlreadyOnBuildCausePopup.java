@@ -47,11 +47,14 @@ public class AlreadyOnBuildCausePopup {
 
     @com.thoughtworks.gauge.Step("Verify modification <modificationOffset> has revision <revision>")
 	public void verifyModificationHasRevision(String modificationOffset, String revision) throws Exception {
-        ElementStub revisionElement = browser.cell("revision").in(elementModificationAt(modificationOffset));
         if (materialType.equals("Pipeline"))
-            assertThat(revisionElement.getText().trim(), containsString(scenarioState.expand(revision)));
+            scenarioState.getBuildCauseResponse().then()
+                    .body(String.format("material_revisions.find { it.material_name == '%s' }.modifications[%s].revision"
+                            ,materialName, modificationOffset), containsString(scenarioState.expand(revision)));
         else
-            assertThat(revisionElement.getText().trim(), containsString(repoState.getRevisionFromAlias(revision)));
+            scenarioState.getBuildCauseResponse().then()
+                    .body(String.format("material_revisions.find { it.material_name == '%s' }.modifications[%s].revision"
+                            ,materialName, modificationOffset), containsString(repoState.getRevisionFromAlias(revision)));
     }
     
 	@com.thoughtworks.gauge.Step("Verify has only <numberOfModificationsExpected> modifications")
@@ -81,7 +84,8 @@ public class AlreadyOnBuildCausePopup {
 
     @com.thoughtworks.gauge.Step("Verify material has changed")
 	public void verifyMaterialHasChanged() throws Exception {
-        assertThat(materialChangedElement().exists(), is(true));
+        scenarioState.getBuildCauseResponse().then()
+                .body(String.format("material_revisions.find { it.material_name == '%s' }.changed",materialName), is(true));
     }
 
     @com.thoughtworks.gauge.Step("Verify material has not changed")
