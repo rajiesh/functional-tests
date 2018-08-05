@@ -108,7 +108,7 @@ public class UsingPipelineDashboardAPI  {
 
         return RestAssured.given().
                 headers(headers).
-                when().post(Urls.urlFor(String.format("/go/api/pipelines/%s/schedule", name)));
+                when().post(Urls.urlFor(String.format("/go/api/pipelines/%s/schedule", scenarioState.pipelineNamed(name))));
 
     }
 
@@ -465,10 +465,10 @@ public class UsingPipelineDashboardAPI  {
 
     private boolean pipelineIsAtLabel(int label){
 
-        ArrayList labels = getDashboard().then()
+        String actual_label = getDashboard().then()
                                       .extract().path(String.format("_embedded.pipelines.find " +
                                       "{ it.name == '%s'}._embedded.instances[-1].label",scenarioState.currentRuntimePipelineName()));
-        return labels.contains(label);
+        return Integer.valueOf(actual_label) == label;
 
     }
 
