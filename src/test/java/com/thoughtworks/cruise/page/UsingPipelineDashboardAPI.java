@@ -199,7 +199,7 @@ public class UsingPipelineDashboardAPI  {
                 String stageCounterLink = getDashboard().then()
                         .extract().path(String.format("_embedded.pipelines.find " +
                                 "{ it.name == '%s'}._embedded.instances.find " +
-                                "{ it.label == '%s' }._embedded.stages[%s]._links.self.href[0]",scenarioState.currentRuntimePipelineName(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
+                                "{ it.label == '%s' }._embedded.stages[%s]._links.self.href",scenarioState.currentRuntimePipelineName(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
                 String stageLinkForThisCounter = String.format("%s/%s/%s/%s", scenarioState.currentRuntimePipelineName(), pipelineLabel, stageName, stageCounter);
                 if(status.contains(stageStatus) && stageCounterLink.contains(stageLinkForThisCounter)){
                     return true;
