@@ -100,7 +100,7 @@ Moving Preferences page valdiations to ruby functional tests since SPAs are not 
 * Navigate to job "default.job"
 * Verify breadcrumb contains pipeline "run.till.file.exists"
 
-* Navigate to pipeline dashboard page
+* On Pipeline Dashboard Page
 
 * Looking at pipeline "run.till.file.exists" - Already On Pipeline Dashboard Page
 * Verify pipeline is in group "group.with.dot" - Already On Pipeline Dashboard Page
