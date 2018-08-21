@@ -199,7 +199,7 @@ public class UsingPipelineDashboardAPI  {
                 String stageCounterLink = getDashboard().then()
                         .extract().path(String.format("_embedded.pipelines.find " +
                                 "{ it.name == '%s'}._embedded.instances.find " +
-                                "{ it.label == '%s' }._embedded.stages[%s]._links.self.href[0]",scenarioState.currentPipeline(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
+                                "{ it.label == '%s' }._embedded.stages[%s]._links.self.href[0]",scenarioState.currentRuntimePipelineName(),pipelineLabel,String.valueOf(oneBasedIndexOfStage-1)));
                 String stageLinkForThisCounter = String.format("%s/%s/%s/%s", scenarioState.currentRuntimePipelineName(), pipelineLabel, stageName, stageCounter);
                 if(status.contains(stageStatus) && stageCounterLink.contains(stageLinkForThisCounter)){
                     return true;
@@ -264,7 +264,7 @@ public class UsingPipelineDashboardAPI  {
         RestAssured.given().
                 headers(headers).
                 body(String.format("{\"pause_cause\": \"%s\"}",pauseCause)).
-                when().get(Urls.urlFor(String.format("/go/api/pipelines/%s/pause", scenarioState.currentRuntimePipelineName()))).then().statusCode(200);
+                when().post(Urls.urlFor(String.format("/go/api/pipelines/%s/pause", scenarioState.currentRuntimePipelineName()))).then().statusCode(200);
     }
 
 
@@ -358,7 +358,7 @@ public class UsingPipelineDashboardAPI  {
 
         RestAssured.given().
                 headers(headers).
-                when().get(Urls.urlFor(String.format("/go/api/pipelines/%s/unpause", scenarioState.currentRuntimePipelineName()))).then().statusCode(200);
+                when().post(Urls.urlFor(String.format("/go/api/pipelines/%s/unpause", scenarioState.currentRuntimePipelineName()))).then().statusCode(200);
     }
 
     @com.thoughtworks.gauge.Step("Verify pipeline has no history")
@@ -515,7 +515,7 @@ public class UsingPipelineDashboardAPI  {
 
     @com.thoughtworks.gauge.Step("Verify pipeline <pipeline> is triggered by <user>")
     public void verifyPipelineIsTriggeredBy(String pipeline, String user) {
-        ArrayList triggered_by_uer = getDashboard().then()
+        String triggered_by_uer = getDashboard().then()
                 .extract().path(String.format("_embedded.pipelines.find " +
                         "{ it.name == '%s'}._embedded.instances[-1].triggered_by",scenarioState.currentRuntimePipelineName()));
         assertTrue("Triggered by user is not as expected.", triggered_by_uer.contains(user));
