@@ -74,8 +74,5 @@ public class AlreadyOnPipelineDashboardPage extends OnPipelineDashboardPage {
 	public void verifyStageIsOnPipelineWithLabel(Integer indexOfStage, String stageStatus, String pipelineLabel) throws Exception {
 		dashboardApi.verifyStageIsOnPipelineWithLabel(indexOfStage, stageStatus, pipelineLabel);
     }
-
-	public void clickCompareLink() throws Exception {
-		super.clickCompareLink();
-	}
+	
 }
