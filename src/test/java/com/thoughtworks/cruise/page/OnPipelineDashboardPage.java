@@ -28,7 +28,6 @@ import com.thoughtworks.cruise.utils.Assertions.Predicate;
 import com.thoughtworks.cruise.utils.ScenarioHelper;
 import com.thoughtworks.cruise.utils.Timeout;
 import net.sf.sahi.client.Browser;
-import net.sf.sahi.client.ElementStub;
 import org.hamcrest.core.Is;
 import org.hamcrest.text.StringContains;
 import org.junit.Assert;
@@ -183,10 +182,9 @@ public class OnPipelineDashboardPage extends CruisePage {
         currentPageState.currentPageIs(CurrentPageState.Page.PIPELINE_HISTORY);
     }
 
-    @com.thoughtworks.gauge.Step("Click compare link")
-    public void clickCompareLink() throws Exception {
-        ElementStub link = browser.link("Compare").in(browser.div("pipeline_" + scenarioState.currentRuntimePipelineName() + "_panel"));
-        link.click();
+    @com.thoughtworks.gauge.Step("Compare pipeline instance <subject> with <comparand>")
+    public void clickCompareLink(String subject, String comparand) throws Exception {
+        browser.navigateTo(Urls.urlFor(String.format("compare/%s/with/%s", scenarioState.currentRuntimePipelineName(), subject, comparand)));
         currentPageState.currentPageIs(Page.COMPARE_PAGE);
     }
 
