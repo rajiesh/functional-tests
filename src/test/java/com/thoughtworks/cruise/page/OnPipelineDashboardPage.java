@@ -184,7 +184,7 @@ public class OnPipelineDashboardPage extends CruisePage {
 
     @com.thoughtworks.gauge.Step("Compare pipeline instance <subject> with <comparand>")
     public void clickCompareLink(String subject, String comparand) throws Exception {
-        browser.navigateTo(Urls.urlFor(String.format("compare/%s/with/%s", scenarioState.currentRuntimePipelineName(), subject, comparand)));
+        browser.navigateTo(Urls.urlFor(String.format("/compare/%s/%s/with/%s", scenarioState.currentRuntimePipelineName(), subject, comparand)));
         currentPageState.currentPageIs(Page.COMPARE_PAGE);
     }
 
