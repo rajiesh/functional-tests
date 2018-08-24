@@ -369,7 +369,7 @@ public class UsingPipelineDashboardAPI  {
     private ArrayList getAllPipelineInstances(){
         return getDashboard().then()
                 .extract().path(String.format("_embedded.pipelines.find " +
-                        "{ it.name == '%s'}._embedded.instances[0]",scenarioState.currentRuntimePipelineName()));
+                        "{ it.name == '%s'}._embedded.instances",scenarioState.currentRuntimePipelineName()));
     }
 
     @com.thoughtworks.gauge.Step("Verify group <groupName> is visible - On Pipeline Dashboard Page")
