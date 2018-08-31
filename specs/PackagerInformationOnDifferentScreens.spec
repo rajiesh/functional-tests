@@ -33,7 +33,6 @@ tags: #7808, plugins-tests
 * Looking at material of type "Package" named "repo-3:CP-2" for pipeline "K1" with counter "1"
 * Verify modification "0" has revision "go-agent-13.1.0-112.noarch"
 * Verify modification "0" has comment containing "Built on go-qa3"
-* Verify modification "0" has modified by containing "anonymous"
 
 * On Pipeline Dashboard Page
 * Looking at pipeline "K1"
