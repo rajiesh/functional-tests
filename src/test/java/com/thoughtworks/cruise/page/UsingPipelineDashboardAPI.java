@@ -226,18 +226,18 @@ public class UsingPipelineDashboardAPI  {
 
     @com.thoughtworks.gauge.Step("Verify pipeline <pipelineName> is not visible")
     public void verifyPipelineIsNotVisible(String pipelineName) throws Exception {
-        ArrayList pipelines = getDashboard().then()
-                .extract().path(String.format("_embedded.pipelines.find " +
-                        "{ it.name == '%s'}.findAll {it != null}",pipelineName));
-        Assert.assertTrue(String.format("Pipeline %s visible on dashboard", pipelineName), pipelines.isEmpty());
+        HashMap pipelines = getDashboard().then()
+                .extract().path(String.format("_embedded.pipelines.findAll " +
+                        "{ it.name == '%s'}",scenarioState.pipelineNamed(pipelineName)));
+        Assert.assertTrue(String.format("Pipeline %s visible on dashboard", pipelineName), (pipelines == null));
     }
 
     @com.thoughtworks.gauge.Step("Verify pipeline <pipelineName> is visible")
     public void verifyPipelineIsVisible(String pipelineName) throws Exception {
-        ArrayList pipelines = getDashboard().then()
+        HashMap pipelines = getDashboard().then()
                 .extract().path(String.format("_embedded.pipelines.find " +
-                        "{ it.name == '%s'}.findAll {it != null}",pipelineName));
-        Assert.assertFalse(String.format("Pipeline %s NOT visible on dashboard", pipelineName), pipelines.isEmpty());
+                        "{ it.name == '%s'}",scenarioState.pipelineNamed(pipelineName)));
+        Assert.assertFalse(String.format("Pipeline %s NOT visible on dashboard", pipelineName), (pipelines == null));
     }
 
     @com.thoughtworks.gauge.Step("Trigger pipeline")
@@ -374,16 +374,16 @@ public class UsingPipelineDashboardAPI  {
 
     @com.thoughtworks.gauge.Step("Verify group <groupName> is visible - On Pipeline Dashboard Page")
     public void verifyGroupIsVisible(final String groupName) throws Exception {
-        ArrayList groups = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.find { it.name == '%s'}}",groupName));
-        Assert.assertFalse(String.format("Pipeline Group %s NOT visible on dashboard", groupName), groups.isEmpty());
+        HashMap groups = getDashboard().then()
+                .extract().path(String.format("_embedded.pipeline_groups.find { it.name == '%s'}",groupName));
+        Assert.assertFalse(String.format("Pipeline Group %s NOT visible on dashboard", groupName), (groups == null));
     }
 
     @com.thoughtworks.gauge.Step("Verify group <groupName> is not visible")
     public void verifyGroupIsNotVisible(String groupName) throws Exception {
-        ArrayList groups = getDashboard().then()
-                .extract().path(String.format("_embedded.pipeline_groups.find { it.name == '%s'}}",groupName));
-        Assert.assertTrue(String.format("Pipeline Group %s visible on dashboard", groupName), groups.isEmpty());
+        HashMap groups = getDashboard().then()
+                .extract().path(String.format("_embedded.pipeline_groups.find { it.name == '%s'}",groupName));
+        Assert.assertTrue(String.format("Pipeline Group %s visible on dashboard", groupName), (groups == null));
     }
 
 
@@ -575,11 +575,11 @@ public class UsingPipelineDashboardAPI  {
             @Override
             public String call() {
                 try {
-                    ArrayList<String> stageName = getDashboard().then()
+                    String stageName = getDashboard().then()
                                                     .extract().path(String.format("_embedded.pipelines.find " +
                                                     "{ it.name == '%s'}._embedded.instances.find { it.label == '%s'}" +
                                                     "._embedded.stages[%d].name",scenarioState.currentRuntimePipelineName(),pipelineLabel,oneBasedStageIndex-1));
-                    return stageName.get(0);
+                    return stageName;
                 } catch (RuntimeException e) {
                     throw e;
                 }
