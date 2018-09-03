@@ -227,7 +227,7 @@ public class UsingPipelineDashboardAPI  {
     @com.thoughtworks.gauge.Step("Verify pipeline <pipelineName> is not visible")
     public void verifyPipelineIsNotVisible(String pipelineName) throws Exception {
         HashMap pipelines = getDashboard().then()
-                .extract().path(String.format("_embedded.pipelines.findAll " +
+                .extract().path(String.format("_embedded.pipelines.find " +
                         "{ it.name == '%s'}",scenarioState.pipelineNamed(pipelineName)));
         Assert.assertTrue(String.format("Pipeline %s visible on dashboard", pipelineName), (pipelines == null));
     }
