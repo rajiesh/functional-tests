@@ -59,10 +59,6 @@ public class AlreadyOnBuildCausePopup {
 		String messageDidNotFindLastModification = "Failed to find modification numbered: " + (numberOfModificationsExpected - 1) +
 				". This suggests that there are lesser modifications than expected (" + numberOfModificationsExpected + ").";
 		assertThat(messageDidNotFindLastModification, matchesExpectedNumberOfModifications(Integer.valueOf(numberOfModificationsExpected)), is(true));
-
-		String messageFoundExtraModification = "Found unexpected modification numbered: " + numberOfModificationsExpected +
-				". This suggests that there are more modifications than expected (" + numberOfModificationsExpected + ").";
-		assertThat(messageFoundExtraModification, matchesExpectedNumberOfModifications(Integer.valueOf(numberOfModificationsExpected)), is(false));
 	}
 
 	@com.thoughtworks.gauge.Step("Verify modification <modificationOffset> has latest revision - Already On Build Cause Popup")
