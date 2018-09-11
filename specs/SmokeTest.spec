@@ -55,21 +55,6 @@ Verify that if upstream pipeline has a timer it triggers the downstream pipeline
 * Trigger pipeline
 * Verify stage "1" is "Passed" on pipeline with label "1"
 
-Check we can see the Pipeline Activity page...
-
-* On Environments Page
-* Looking at "uat" environment
-* Verify pipeline is visible "environment-pipeline"
-* Click on pipeline "environment-pipeline"
-* Verify on "Pipeline Activity" page for "environment-pipeline"
-
-Check we can see the Stage Details page...
-
-* On Environments Page
-* Looking at "uat" environment
-* Verify pipeline is visible "environment-pipeline"
-* Click on stage "defaultStage" of pipeline "environment-pipeline"
-* Verify on stage details page for "environment-pipeline" stage "defaultStage"
 
 Check we can see the Job Details page...
 
